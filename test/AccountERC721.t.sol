@@ -26,7 +26,7 @@ contract AccountERC721Test is Test {
     function setUp() public {
         dummyERC721 = new MockERC721();
 
-        implementation = new AccountV3(address(1), address(1), address(1), address(1));
+        implementation = new AccountV3(address(1), address(1), address(1), address(1), address(1));
         registry = new ERC6551Registry();
 
         tokenCollection = new MockERC721();

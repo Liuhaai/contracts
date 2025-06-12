@@ -81,7 +81,7 @@ abstract contract NestedAccountExecutor is BaseExecutor {
             }
         }
 
-        if (!_isValidExecutor(current)) revert NotAuthorized();
+        if (!_isValidExecutor(current, to, data)) revert NotAuthorized();
 
         _beforeExecute();
 

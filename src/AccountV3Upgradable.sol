@@ -9,11 +9,12 @@ contract AccountV3Upgradable is AccountV3, UUPSUpgradeable {
         address entryPoint_,
         address multicallForwarder,
         address erc6551Registry,
-        address guardian
-    ) AccountV3(entryPoint_, multicallForwarder, erc6551Registry, guardian) {}
+        address guardian,
+        address executionDelegatorManager
+    ) AccountV3(entryPoint_, multicallForwarder, erc6551Registry, guardian, executionDelegatorManager) {}
 
     function _authorizeUpgrade(address implementation) internal virtual override {
         if (!guardian.isTrustedImplementation(implementation)) revert InvalidImplementation();
-        if (!_isValidExecutor(_msgSender())) revert NotAuthorized();
+        if (!_isValidSigner(_msgSender(), "")) revert NotAuthorized();
     }
 }

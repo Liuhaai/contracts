@@ -17,6 +17,7 @@ import "./abstract/execution/TokenboundExecutor.sol";
 import "./lib/OPAddressAliasHelper.sol";
 
 import "./interfaces/IAccountGuardian.sol";
+import "./interfaces/IExecutionDelegatorManager.sol";
 
 /**
  * @title Tokenbound ERC-6551 Account Implementation
@@ -32,6 +33,9 @@ contract AccountV3 is
     TokenboundExecutor
 {
     IAccountGuardian immutable guardian;
+    IExecutionDelegatorManager immutable executionDelegatorManager;
+
+    bool private _delegationEnabled;
 
     /**
      * @param entryPoint_ The ERC-4337 EntryPoint address
@@ -43,9 +47,12 @@ contract AccountV3 is
         address entryPoint_,
         address multicallForwarder,
         address erc6551Registry,
-        address _guardian
+        address _guardian,
+        address _executionDelegatorManager
     ) ERC4337Account(entryPoint_) TokenboundExecutor(multicallForwarder, erc6551Registry) {
         guardian = IAccountGuardian(_guardian);
+        executionDelegatorManager = IExecutionDelegatorManager(_executionDelegatorManager);
+        _delegationEnabled = false;
     }
 
     /**
@@ -76,6 +83,12 @@ contract AccountV3 is
     function owner() public view returns (address) {
         (uint256 chainId, address tokenContract, uint256 tokenId) = ERC6551AccountLib.token();
         return _tokenOwner(chainId, tokenContract, tokenId);
+    }
+
+
+    function setDelegationEnabled(bool enabled) external {
+        if (!_isValidSigner(_msgSender(), ""))  revert NotAuthorized();
+        _delegationEnabled = enabled;
     }
 
     /**
@@ -222,35 +235,27 @@ contract AccountV3 is
      * @param executor The address to query authorization for
      * @return True if the executor is authorized, false otherwise
      */
-    function _isValidExecutor(address executor) internal view virtual override returns (bool) {
+    function _isValidExecutor(address executor, address to, bytes calldata data) internal view virtual override returns (bool) {
+        // Allow execution via ExecutionDelegatorManager
+        if (_delegationEnabled && executionDelegatorManager.isAuthorized(executor, to, data)) return true;
+
         // Allow execution from ERC-4337 EntryPoint
         if (executor == address(entryPoint())) return true;
 
-        (uint256 chainId, address tokenContract, uint256 tokenId) = ERC6551AccountLib.token();
+        (uint256 chainId, ,) = ERC6551AccountLib.token();
 
         // Allow cross chain execution
         if (chainId != block.chainid) {
-            // Allow execution from L1 account on OPStack chains
-            if (OPAddressAliasHelper.undoL1ToL2Alias(_msgSender()) == address(this)) {
-                return true;
-            }
+            // // Allow execution from L1 account on OPStack chains
+            // if (OPAddressAliasHelper.undoL1ToL2Alias(_msgSender()) == address(this)) {
+            //     return true;
+            // }
 
             // Allow execution from trusted cross chain bridges
             if (guardian.isTrustedExecutor(executor)) return true;
         }
 
-        // Allow execution from owner
-        address _owner = _tokenOwner(chainId, tokenContract, tokenId);
-        if (executor == _owner) return true;
-
-        // Allow execution from root owner of account tree
-        address _rootOwner = _rootTokenOwner(_owner, chainId, tokenContract, tokenId);
-        if (executor == _rootOwner) return true;
-
-        // Allow execution from permissioned account
-        if (hasPermission(executor, _rootOwner)) return true;
-
-        return false;
+        return _isValidSigner(executor, "");
     }
 
     /**
@@ -346,12 +351,13 @@ contract AccountV3 is
         virtual
         returns (address)
     {
-        if (chainId != block.chainid) return address(0);
+        // if (chainId != block.chainid) return address(0);
         if (tokenContract.code.length == 0) return address(0);
 
         try IERC721(tokenContract).ownerOf(tokenId) returns (address _owner) {
             return _owner;
         } catch {
+        // TODO: add ownership oracle for project-issued NFT
             return address(0);
         }
     }

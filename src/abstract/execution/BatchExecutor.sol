@@ -26,11 +26,13 @@ abstract contract BatchExecutor is BaseExecutor {
         payable
         returns (bytes[] memory)
     {
-        if (!_isValidExecutor(_msgSender())) revert NotAuthorized();
+        uint256 length = operations.length;
+        for (uint256 i = 0; i < length; i++) {
+            if (!_isValidExecutor(_msgSender(), operations[i].to, operations[i].data)) revert NotAuthorized();
+        }
 
         _beforeExecute();
-
-        uint256 length = operations.length;
+        
         bytes[] memory results = new bytes[](length);
 
         for (uint256 i = 0; i < length; i++) {
