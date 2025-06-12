@@ -12,5 +12,5 @@ import "./SandboxExecutor.sol";
 abstract contract BaseExecutor is Context, SandboxExecutor {
     function _beforeExecute() internal virtual {}
 
-    function _isValidExecutor(address executor) internal view virtual returns (bool);
+    function _isValidExecutor(address executor, address to, bytes calldata data) internal view virtual returns (bool);
 }

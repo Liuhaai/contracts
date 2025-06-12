@@ -34,10 +34,10 @@ abstract contract ERC6551Executor is IERC6551Executable, ERC165, BaseExecutor {
         virtual
         returns (bytes memory)
     {
-        if (!_isValidExecutor(_msgSender())) revert NotAuthorized();
-
+        if (!_isValidExecutor(_msgSender(), to, data)) revert NotAuthorized();
+        
         _beforeExecute();
-
+        
         return LibExecutor._execute(to, value, data, operation);
     }
 

@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 import "../src/AccountGuardian.sol";
 import "../src/AccountV3Upgradable.sol";
 import "../src/AccountProxy.sol";
+import "../src/execute-delegate/ExecutionDelegatorManager.sol";
 
 contract DeployAccountV3 is Script {
     function run() external {
@@ -16,6 +17,8 @@ contract DeployAccountV3 is Script {
         address factory = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
 
         address tokenboundSafe = 0x781b6A527482828bB04F33563797d4b696ddF328;
+        // TODO: change this to the actual delegator manager safe
+        address delegatorManagerSafe = 0x3174B19C3dcE9B6536b4e964EAFa8761C4F5B53d;
         address erc4337EntryPoint = 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789;
         address multicallForwarder = 0xcA1167915584462449EE5b4Ea51c37fE81eCDCCD;
         address erc6551Registry = 0x000000006551c19487814612e58FE06813775758;
@@ -27,12 +30,19 @@ contract DeployAccountV3 is Script {
             ),
             factory
         );
+        address executionDelegatorManager = Create2.computeAddress(
+            salt,
+            keccak256(
+                abi.encodePacked(type(ExecutionDelegatorManager).creationCode, abi.encode(delegatorManagerSafe))
+            ),
+            factory
+        );
         address implementation = Create2.computeAddress(
             salt,
             keccak256(
                 abi.encodePacked(
                     type(AccountV3Upgradable).creationCode,
-                    abi.encode(erc4337EntryPoint, multicallForwarder, erc6551Registry, guardian)
+                    abi.encode(erc4337EntryPoint, multicallForwarder, erc6551Registry, guardian, executionDelegatorManager)
                 )
             ),
             factory
@@ -58,6 +68,17 @@ contract DeployAccountV3 is Script {
             console.log("AccountGuardian:", guardian, "(exists)");
         }
 
+        // Deploy ExecutionDelegatorManager
+        if (executionDelegatorManager.code.length == 0) {
+            vm.startBroadcast();
+            new ExecutionDelegatorManager{salt: salt}(delegatorManagerSafe);
+            vm.stopBroadcast();
+
+            console.log("ExecutionDelegatorManager:", executionDelegatorManager, "(deployed)");
+        } else {
+            console.log("ExecutionDelegatorManager:", executionDelegatorManager, "(exists)");
+        }
+
         // Deploy Account implementation
         if (implementation.code.length == 0) {
             vm.startBroadcast();
@@ -65,7 +86,8 @@ contract DeployAccountV3 is Script {
                 erc4337EntryPoint,
                 multicallForwarder,
                 erc6551Registry,
-                guardian
+                guardian,
+                executionDelegatorManager
             );
             vm.stopBroadcast();
 
@@ -97,11 +119,21 @@ contract DeployAccountV3 is Script {
             )
         );
         console.log(
+            "ExecutionDelegatorManager: forge verify-contract --num-of-optimizations 200 --chain-id",
+            block.chainid,
+            executionDelegatorManager,
+            string.concat(
+                "src/execute-delegate/ExecutionDelegatorManager.sol:ExecutionDelegatorManager --constructor-args $(cast abi-encode \"constructor(address)\" ",
+                Strings.toHexString(guardian),
+                ")\n"
+            )
+        );
+        console.log(
             "AccountV3Upgradable: forge verify-contract --num-of-optimizations 200 --chain-id",
             block.chainid,
             implementation,
             string.concat(
-                "src/AccountV3Upgradable.sol:AccountV3Upgradable --constructor-args $(cast abi-encode \"constructor(address,address,address,address)\" ",
+                "src/AccountV3Upgradable.sol:AccountV3Upgradable --constructor-args $(cast abi-encode \"constructor(address,address,address,address,address)\" ",
                 Strings.toHexString(erc4337EntryPoint),
                 " ",
                 Strings.toHexString(multicallForwarder),
@@ -109,6 +141,8 @@ contract DeployAccountV3 is Script {
                 Strings.toHexString(erc6551Registry),
                 " ",
                 Strings.toHexString(guardian),
+                " ",
+                Strings.toHexString(executionDelegatorManager),
                 ")\n"
             )
         );

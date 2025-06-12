@@ -33,7 +33,7 @@ contract AccountTest is Test {
     function setUp() public {
         registry = new ERC6551Registry();
 
-        implementation = new AccountV3(address(1), address(1), address(registry), address(1));
+        implementation = new AccountV3(address(1), address(1), address(registry), address(1), address(1));
 
         tokenCollection = new MockERC721();
 

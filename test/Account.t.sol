@@ -18,6 +18,7 @@ import "../src/AccountV3.sol";
 import "../src/AccountV3Upgradable.sol";
 import "../src/AccountGuardian.sol";
 import "../src/AccountProxy.sol";
+import "../src/execute-delegate/ExecutionDelegatorManager.sol";
 
 import "./mocks/MockERC721.sol";
 import "./mocks/MockSigner.sol";
@@ -33,6 +34,7 @@ contract AccountTest is Test {
     AccountProxy proxy;
     ERC6551Registry public registry;
     AccountGuardian public guardian;
+    ExecutionDelegatorManager public executionDelegatorManager;
 
     MockERC721 public tokenCollection;
 
@@ -41,11 +43,12 @@ contract AccountTest is Test {
 
         forwarder = new Multicall3();
         guardian = new AccountGuardian(address(this));
+        executionDelegatorManager = new ExecutionDelegatorManager(address(this));
         implementation = new AccountV3(
-            address(1), address(forwarder), address(registry), address(guardian)
+            address(1), address(forwarder), address(registry), address(guardian), address(executionDelegatorManager)
         );
         upgradableImplementation = new AccountV3Upgradable(
-            address(1), address(forwarder), address(registry), address(guardian)
+            address(1), address(forwarder), address(registry), address(guardian), address(executionDelegatorManager)
         );
         proxy = new AccountProxy(address(guardian), address(upgradableImplementation));
 
@@ -200,7 +203,7 @@ contract AccountTest is Test {
         // cannot be locked for more than 365 days
         vm.prank(user1);
         vm.expectRevert(ExceedsMaxLockTime.selector);
-        account.lock(366 days);
+        account.lock(block.timestamp + 366 days);
 
         uint256 state = account.state();
 
@@ -660,6 +663,7 @@ contract AccountTest is Test {
         AccountV3Upgradable account = AccountV3Upgradable(payable(accountAddress));
 
         MockAccountUpgradable upgradedImplementation = new MockAccountUpgradable(
+            address(1),
             address(1),
             address(1),
             address(1),

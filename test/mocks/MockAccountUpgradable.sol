@@ -9,8 +9,9 @@ contract MockAccountUpgradable is AccountV3Upgradable {
         address entryPoint_,
         address multicallForwarder,
         address erc6551Registry,
-        address guardian
-    ) AccountV3Upgradable(entryPoint_, multicallForwarder, erc6551Registry, guardian) {}
+        address guardian,
+        address executionDelegatorManager
+    ) AccountV3Upgradable(entryPoint_, multicallForwarder, erc6551Registry, guardian, executionDelegatorManager) {}
 
     function customFunction() external pure returns (uint256) {
         return 12345;
